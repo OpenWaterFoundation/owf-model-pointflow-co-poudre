@@ -1,0 +1,31 @@
+# Cache la Poudre River hourly point flow model
+#
+StartLog(LogFile="PoudreHourlyPointFlow.TSTool.log")
+SetOutputPeriod(OutputStart="CurrentToMinute - 7Day",OutputEnd="CurrentToMinute")
+# Read the time series associated with network nodes (pregenerated in a separate TSTool command file)
+ReadDateValue(InputFile="..\data-files\Poudre_Hourly_Time_Series_Data")
+#
+# Fill missing time series data with repeat forward and backward
+# This seems to be adequate for the shorter period of record (2 weeks)
+FillRepeat(TSList=AllMatchingTSID,TSID="*Hour*",FillDirection=Backward,FillFlag="FilledValue")
+FillRepeat(TSList=AllMatchingTSID,TSID="*Hour*",FillDirection=Forward,FillFlag="FilledValue")
+CheckTimeSeries(CheckCriteria="Missing")
+ReadTableFromExcel(TableID="Network",InputFile="..\data-files\Poudre_PointFlow_Dataset.xlsx",Worksheet="Northern_Nodes_with_Coordinates",ExcelColumnNames=FirstRowInRange,ExcelIntegerColumns="NodeOrder")
+#
+# Analyze the network point flow
+AnalyzeNetworkPointFlow(TableID="Network",NodeIDColumn="RealTimeNodeID",NodeNameColumn="NodeName",NodeTypeColumn="NodeType",NodeDistanceColumn="NodeDist",NodeWeightColumn="NodeWeight",DownstreamNodeIDColumn="RealTimeDownstreamNodeID",NodeAddTypes="Return",NodeAddDataTypes="DISCHRG,DISCHRG1,DISCHRG2,DISCHRG3,DISCHRG4,DISCHRGA,Empty",NodeSubtractTypes="Diversion",NodeSubtractDataTypes="DISCHRG,DISCHRG1,DISCHRG2,DISCHRG3,DISCHRG4,DISCHRGA,Empty",NodeOutflowTypes="StreamGage",NodeOutflowDataTypes="DISCHRG,DISCHRG1,DISCHRG2,DISCHRG3,DISCHRG4,DISCHRGA,AdminFlow,00060-00000",NodeFlowThroughTypes="InstreamFlow",Interval=Hour,AnalysisStart="OutputStart",AnalysisEnd="OutputEnd",Units="CFS",GainMethod="Distance",OutputTableID="Results")
+#
+# Set negative flow values to 0
+# Note that the time series "NodeOutflow" is considered the flow in the river itself
+ReplaceValue(TSList=AllMatchingTSID,TSID="*NodeOutflow.Hour*",MinValue=-99999,MaxValue=-0.01,NewValue=0,SetFlag="Neg. Value Set to Zero")
+#
+# Write time series to table
+TimeSeriesToTable(TSList=AllMatchingTSID,TSID="*NodeOutflow.Hour*",TableID="Poudre_Nodes_Hourly",DateTimeColumn="Date",TableTSIDColumn="RealTimeNodeID",TableTSIDFormat="%L",ValueColumn="Discharge_cfs",IfTableNotFound="Create")
+# Join the Network table to the table so that each node has a descriptive name; will be used for the heatmap
+JoinTables(TableID="Poudre_Nodes_Hourly",TableToJoinID="Network",JoinColumns="RealTimeNodeID:RealTimeNodeID")
+# Reformat some of the data
+FormatTableDateTime(TableID="Poudre_Nodes_Hourly",InputColumn="Date",DateTimeFormat="%m/%d/%Y %I %p",OutputColumn="Date_v1",OutputType=DateTime,InsertBeforeColumn="Date")
+DeleteTableColumns(TableID="Poudre_Nodes_Hourly",DeleteColumns="Date")
+CopyTable(TableID="Poudre_Nodes_Hourly",NewTableID="Poudre_Nodes_Hourly_v2",IncludeColumns="Date_v1,NodeName,Discharge_cfs,NodeType",ColumnMap="Date_v1:Date,NodeName:Node")
+WriteTableToDelimitedFile(TableID="Poudre_Nodes_Hourly_v2",OutputFile="..\data-files\Poudre_Nodes_Hourly.csv",WriteHeaderComments=False)
+#

@@ -1,0 +1,33 @@
+# Cache la Poudre River daily point flow model
+#
+StartLog(LogFile="PoudreDailyPointFlow.TSTool.log")
+# Read the time series associated with network nodes (pregenerated in a separate TSTool command file)
+ReadDateValue(InputFile="..\data-files\Poudre_Daily_Time_Series_Data")
+# Fill diversion time series with zeros so there is something to analyze
+# Fill return time series with zeros so there is something to analyze
+# Fill stream gage time series with repeat forward and backward
+# **Note that depending on the gage, this fills in a lot of data, which isn't correct.  Need to evaluate further
+FillConstant(TSList=AllMatchingTSID,TSID="*DivTotal*",ConstantValue=0)
+FillConstant(TSList=AllMatchingTSID,TSID="*ReturnTotal*",ConstantValue=0)
+FillRepeat(TSList=AllMatchingTSID,TSID="*GageTotal*",FillDirection=Backward)
+FillRepeat(TSList=AllMatchingTSID,TSID="*GageTotal*",FillDirection=Forward)
+CheckTimeSeries(CheckCriteria="Missing")
+ReadTableFromExcel(TableID="Network",InputFile="..\data-files\Poudre_PointFlow_Dataset.xlsx",Worksheet="Northern_Nodes_with_Coordinates",ExcelColumnNames=FirstRowInRange,ExcelIntegerColumns="NodeOrder")
+#
+# Analyze the network point flow
+AnalyzeNetworkPointFlow(TableID="Network",NodeIDColumn="NodeID",NodeNameColumn="NodeName",NodeTypeColumn="NodeType",NodeDistanceColumn="NodeDist",NodeWeightColumn="NodeWeight",DownstreamNodeIDColumn="DownstreamNodeID",NodeAddTypes="Return",NodeAddDataTypes="DivTotal,AdminFlow,ReturnTotal,Empty",NodeSubtractTypes="Diversion",NodeSubtractDataTypes="DivTotal,Empty",NodeOutflowTypes="StreamGage",NodeOutflowDataTypes="Streamflow,AdminFlow",NodeFlowThroughTypes="InstreamFlow",Interval=Day,AnalysisStart="2000-01-01",AnalysisEnd="2015-12-31",Units="CFS",GainMethod="Distance",OutputTableID="Results")
+#
+# Set negative flow values to 0
+# Note that the time series "NodeOutflow" is considered the flow in the river itself
+ReplaceValue(TSList=AllMatchingTSID,TSID="*NodeOutflow.Day*",MinValue=-99999,MaxValue=-0.01,NewValue=0)
+#
+# Write time series to table for 2002 data
+TimeSeriesToTable(TSList=AllMatchingTSID,TSID="*NodeOutflow.Day*",TableID="Poudre_Nodes_2002",DateTimeColumn="Date",TableTSIDColumn="NodeID",TableTSIDFormat="%L",ValueColumn="Discharge_cfs",OutputStart="2002-01-01",OutputEnd="2002-12-31",IfTableNotFound="Create")
+# Join the Network table to the table so that each node has a descriptive name; will be used for the heatmap
+JoinTables(TableID="Poudre_Nodes_2002",TableToJoinID="Network",JoinColumns="NodeID:NodeID")
+# Reformat some of the data
+FormatTableDateTime(TableID="Poudre_Nodes_2002",InputColumn="Date",DateTimeFormat="%m/%d/%Y",OutputColumn="Date_v1",OutputType=DateTime,InsertBeforeColumn="Date")
+DeleteTableColumns(TableID="Poudre_Nodes_2002",DeleteColumns="Date")
+CopyTable(TableID="Poudre_Nodes_2002",NewTableID="Poudre_Nodes_2002_v2",IncludeColumns="Date_v1,NodeName,Discharge_cfs,NodeType",ColumnMap="Date_v1:Date,NodeName:Node")
+WriteTableToDelimitedFile(TableID="Poudre_Nodes_2002_v2",OutputFile="..\data-files\Poudre_Nodes_Daily_2002.csv",WriteHeaderComments=False)
+#

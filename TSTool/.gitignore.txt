@@ -1,0 +1,10 @@
+# Make sure this folder remains empty except for the TSTool command files (deletes the log files).
+
+*
+!.gitignore
+!Poudre_Daily_PointFlowModel.TSTool
+!Poudre_Hourly_PointFlowModel.TSTool
+!Poudre_Nodes_Data_Download.TSTool
+
+
+

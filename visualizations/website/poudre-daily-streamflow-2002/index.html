@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Poudre River Daily Streamflow 2002</title>
+  <!-- Javascript -->
+  <script src="../../../javascript/highcharts.js"></script>
+  <script src="../../../javascript/heatmap.js"></script>
+  <script src="../../../javascript/exporting.js"></script>
+  <script src="../../../javascript/data.js"></script>
+  <script src="../../../javascript/jquery-3.2.1.min.js"></script>
+</head>
+<style>
+.tooltip-above{
+  display: block;
+  background-color: #fff;
+  padding:9px;
+  margin-left: 1px;
+  margin-top: 1px;
+  text-align: center;
+}
+/* basic positioning */
+.legend { list-style: none; }
+.legend li { float: left; margin-right: 10px; }
+.legend span { border: 1px solid #ccc; float: left; width: 12px; height: 12px; margin: 2px; }
+/* your colors */
+.legend .gray { background-color: gray; }
+.legend .lightblue { background-color: lightblue; }
+.legend .yellow { background-color: yellow; }
+</style>
+<body>
+<div id="container" style="width:100%; height:900px;"></div>
+<ul class="legend">
+    <li><span class="gray"></span>Gage (at)</li>
+    <li><span class="lightblue"></span>Diversion (below)</li>
+    <li><span class="yellow"></span>Return (above)</li>
+</ul>
+
+<script>
+
+  /* Read Poudre_PointFlow_Dataset in order to get X axis categories */
+  $.get("../../../data-files/Poudre_PointFlow_Dataset.csv",function(csv){
+    /* The variable below (var x_label_categories) is an array. This array will
+    contain multiple strings containing html code that will be used to properly
+    color each x axis label based on if it is a StreamGage, Diversion, or Return. */
+    var x_label_categories = new Array();
+    /* The variable below (var lines) will split up the data being 
+    read in line-by-line. Each iteration of var lines will contain one
+    row of data.*/
+    var lines = csv.split('\n');
+    $.each(lines, function(lineNo,line){
+      if(lineNo > 0)
+      {
+        if(line != '')
+        {
+          var items = line.split(',');
+          if(!x_label_categories.includes(items[1]))
+          {
+            var x_label_info = '';
+            /* Check if Stream Gage */ 
+            if(items[2] == "StreamGage")
+            {
+              x_label_info = '<span style="font-size: 12px; background: #c6c6c4; color: black;">' + items[1] + '</span>';
+            }
+            /* Check if Diversion */
+            else if(items[2] == "Diversion")
+            {
+              x_label_info = '<span style="font-size: 12px; background: LightBlue; color: black;">' + items[1] + '</span>';
+            }
+            /* Check if Return */
+            else
+            {
+              x_label_info = '<span style="font-size: 12px; background: #f7f591; color: black;">' + items[1] + '</span>';
+            }  
+            x_label_categories.push(x_label_info);
+          }
+        }
+      }
+    });
+    $.get("../../../data-files/Poudre_Nodes_Daily_2002.csv",function(csv) {
+
+    /* The variable below (var series) will contain the 
+       data points being read in from the csv file. This
+       will then be passed into the series option when creating
+       a new Highchart. */
+    var series = {
+      turboThreshold: 0,
+      // rowsize: 24 * 36e5,
+      data: [],
+    };
+
+    /* The variable below (var lines) will split up the data being 
+    read in line-by-line. Each iteration of var lines will contain one
+    row of data.*/
+    var lines = csv.split('\n');
+
+
+    /* The variable below (var dates) is an array. After iterating through 
+    the csv file, dates will contain a 'list' of all the dates within the data */
+    var list_of_dates = new Array();
+
+    /* The variable below (var nodes) is an array. After iterating through the
+    csv file, nodes will contain a 'list' of names for all the nodes within the data */
+    var list_of_nodes = new Array();
+
+    /* The function below will iterate through the entire csv file line by line. 
+    While reading through each line of data, it will split up each row by the delimiter 
+    (in this case a ','). It will then check if a date has already been added to the dates array.
+    If a date has not been added to the array then that date will be added to the list of dates. */
+    $.each(lines, function(lineNo,line){
+      if(lineNo > 0)
+      {
+        if(line != '')
+        {
+          var items = line.split(',');
+          if(!list_of_dates.includes(items[0]))
+          {
+            list_of_dates.push(items[0]);
+          }
+
+          if(!list_of_nodes.includes(items[1]))
+          {
+            list_of_nodes.push(items[1]);
+          }
+        }
+      }
+    });
+
+    /* The function below will iterate through the entire csv file line by line. While reading through each line 
+    of data, it will split up each row by the delimiter (in this case a ','). It will then push on each row of data into 
+    the data array specified earlier in the series variable (var series). The whole purpose of this function is to make the data 
+    readable for Highcharts. Since the data array contains a list of dates, it will push the index (0,1,2,etc.) of where that date lies 
+    within the array. 
+
+    For example, if the date was 2016-01-01 and its index was 32, then the data being pushed to the data array would look similar to the following:
+    [Canyon Mouth Cage, 32, 1.3].
+    */
+    $.each(lines, function(lineNo,line){
+      if(lineNo > 0)
+      {
+        if(line != '')
+        {
+          var items = line.split(',');
+          series.data.push([parseFloat(getNodeIndex(items[1])),parseFloat(getDateIndex(items[0])),parseFloat(items[2])]);
+        }
+      }
+    });
+
+    /* The function below takes in a string variable that contains a date. It will then iterate through the 
+    dates array specified earlier and return the index of where the date lives within the array. */
+    function getDateIndex(date)
+    {
+      for(var index = 0; index < list_of_dates.length; index++)
+      {
+        if(date == list_of_dates[index])
+        {
+          return index;
+        }
+      }
+    }
+
+    /* The function below takes in a string variable that contains the name of a node. It will then iterate 
+    through the nodes array specified earlier and return the index of where the node name lives within the array. */
+    function getNodeIndex(nodeID)
+    {
+      for(var index = 0; index < list_of_nodes.length; index++)
+      {
+        if(nodeID == list_of_nodes[index])
+        {
+          return index;
+        }
+      }
+    }
+
+  Highcharts.chart('container', {
+
+    chart: {
+      type: 'heatmap',
+    },
+
+    title: {
+      text: 'Poudre River Daily Streamflow'
+    },
+
+    yAxis: {
+      categories: list_of_dates,
+      reversed: true,
+      title: {
+        text: 'Date'
+      },
+      showLastLabel: false
+    },
+
+    xAxis: {
+    categories: x_label_categories,
+    reversed: false,
+    opposite: true,
+    labels:
+    {
+      rotation: -90,
+      useHTML: true
+    },
+      minPadding: 0,
+      maxPadding: 0,
+     },
+
+     colorAxis: {
+          dataClasses: [{
+            to: (0), color:"#fcfcfc"
+        }, {  
+        from: (0.01),
+        to: (5), color:"#d7e1f2"
+                }, {
+        from: (5.01),
+        to: (15), color:"#82cee5"
+        },{
+        from: (15.01),
+        to: (30), color:"#3d93af"
+        },{
+        from: (30.01),
+        to: (55), color:"#06afe8"
+        },{
+        from: (55.01),
+        to: (85), color:"#0a6cb2"
+        },{
+        from: (85.01),
+		to: (855), color:"black"}],
+          labels: {
+              format: '{value} cfs'
+          }
+      },
+
+      legend: {
+          align: 'center',
+          layout: 'horizontal',
+          margin: 0,
+          verticalAlign: 'bottom',
+          y: 25,
+          symbolHeight: 10,
+      symbolRadius: 0
+      },
+
+      tooltip: {  // control what the tooltip will display when a user hovers over a point on the heatmap
+        useHTML: true,
+        padding: 0,
+        formatter: function()
+        {
+          return '<div class="tooltip-above"><span style="font-size: 12px;"><strong>Discharge</strong><br>' + this.series.yAxis.categories[this.point.y] + ': ' + this.point.value + ' cfs</span></div>';
+        },
+        useHTML: true
+
+      },
+
+      series: [series]
+  });
+});
+  });
+</script>
+
+</body>
+</html>

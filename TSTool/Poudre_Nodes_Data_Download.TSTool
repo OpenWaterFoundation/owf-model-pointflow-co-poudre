@@ -1,0 +1,124 @@
+# Cache la Poudre River Node Network Time Series Data Download
+# This command file takes about 5 minutes to run
+#
+# First read in the Excel file of the node network
+ReadTableFromExcel(TableID="Network",InputFile="..\data-files\Poudre_PointFlow_Dataset.xlsx",Worksheet="Northern_Nodes_with_Coordinates",ExcelColumnNames=FirstRowInRange)
+# Copy the Network table and create 3 new tables of diversions, returns, and streamflow gages
+CopyTable(TableID="Network",NewTableID="Network_Diversion",IncludeColumns="NodeID,RealTimeNodeID,DataSource",ColumnFilters="NodeType:Diversion")
+CopyTable(TableID="Network",NewTableID="Network_Return",IncludeColumns="NodeID,RealTimeNodeID,DataSource",ColumnFilters="NodeType:Return")
+CopyTable(TableID="Network",NewTableID="Network_Gage",IncludeColumns="NodeID,RealTimeNodeID,DataSource",ColumnFilters="NodeType:StreamGage")
+####################
+# DAILY DATA
+####################
+SetInputPeriod(InputStart="01/01/2000",InputEnd="12/31/2016")
+#
+# Download diversions; note that errors are okay here, just trying to get all of the time series downloaded
+ReadTimeSeriesList(TableID="Network_Diversion",LocationColumn="NodeID",DataSourceColumn="DataSource",DataType="DivTotal",Interval="Day",DataStore="ColoradoWaterHBGuest",Alias="%L-DivTotal-Day",IfNotFound=Warn)
+ReadTimeSeriesList(TableID="Network_Diversion",LocationColumn="NodeID",DataSourceColumn="DataSource",DataType="AdminFlow",Interval="Day",DataStore="ColoradoWaterHBGuest",Alias="%L-AdminDiv-Day",IfNotFound=Warn)
+#
+# Download returns; note that errors are okay here, just trying to get all of the time series downloaded
+ReadTimeSeriesList(TableID="Network_Return",LocationColumn="NodeID",DataSourceColumn="DataSource",DataType="DivTotal",Interval="Day",DataStore="ColoradoWaterHBGuest",Alias="%L-ReturnTotal-Day",IfNotFound=Warn)
+ReadTimeSeriesList(TableID="Network_Return",LocationColumn="NodeID",DataSourceColumn="DataSource",DataType="AdminFlow",Interval="Day",DataStore="ColoradoWaterHBGuest",Alias="%L-ReturnTotal-Day",IfNotFound=Warn)
+#
+# Download stream gages; note that errors are okay here, just trying to get all of the time series downloaded
+ReadTimeSeriesList(TableID="Network_Gage",LocationColumn="NodeID",DataSourceColumn="DataSource",DataType="Streamflow",Interval="Day",DataStore="ColoradoWaterHBGuest",Alias="%L-GageTotal-Day",IfNotFound=Warn)
+ReadTimeSeriesList(TableID="Network_Gage",LocationColumn="NodeID",DataSourceColumn="DataSource",DataType="AdminFlow",Interval="Day",DataStore="ColoradoWaterHBGuest",Alias="%L-GageTotal-Day",IfNotFound=Warn)
+#
+# Select nodes that have multiple time series associated with them.  These will be merged together into one time series
+# NOTE: this currently must be done by hand and will vary depending on the river of interest  KMS TO DO:  NEED TO FIND A WAY TO AUTOMATE THIS
+FillFromTS(TSList=AllMatchingTSID,TSID="*CLAWASCO*Streamflow*",IndependentTSList=AllMatchingTSID,IndependentTSID="*CLAWASCO*AdminFlow*")
+FillFromTS(TSList=AllMatchingTSID,TSID="*06752500*Streamflow*",IndependentTSList=AllMatchingTSID,IndependentTSID="*06752500*AdminFlow*")
+FillFromTS(TSList=AllMatchingTSID,TSID="*06752000*Streamflow*",IndependentTSList=AllMatchingTSID,IndependentTSID="*06752000*AdminFlow*")
+FillFromTS(TSList=AllMatchingTSID,TSID="*0300911*DivTotal*",IndependentTSList=AllMatchingTSID,IndependentTSID="*0300911*AdminFlow*")
+FillFromTS(TSList=AllMatchingTSID,TSID="*0301029*DivTotal*",IndependentTSList=AllMatchingTSID,IndependentTSID="*0301029*AdminFlow*")
+# Delete the time series that aren't needed
+Free(TSList=AllMatchingTSID,TSID="06752000.DWR.AdminFlow.Day")
+Free(TSList=AllMatchingTSID,TSID="CLAWASCO.DWR.AdminFlow.Day")
+Free(TSList=AllMatchingTSID,TSID="06752500.DWR.AdminFlow.Day")
+Free(TSList=AllMatchingTSID,TSID="0300911.*.AdminFlow.Day")
+Free(TSList=AllMatchingTSID,TSID="0301029.*.AdminFlow.Day")
+#
+# Copy time series properties to know how many nodes have data
+CopyTimeSeriesPropertiesToTable(TSList=AllMatchingTSID,TSID="*Day*",TableID="Nodes_WithDailyData",TableTSIDColumn="TSID",TableTSIDFormat="%L")
+CopyTable(TableID="Nodes_WithDailyData",NewTableID="Nodes_WithDailyData_v2",IncludeColumns="TSID")
+# Create a column to indicate that these nodes have data
+InsertTableColumn(TableID="Nodes_WithDailyData_v2",InsertColumn="HasData",InitialValue="Yes")
+# Join the table with the original network table to identify which nodes have data.  Then copy the table and only include the nodes that do not have data
+# Empty time series will be created for the nodes without data
+JoinTables(TableID="Nodes_WithDailyData_v2",TableToJoinID="Network",JoinColumns="TSID:NodeID",IncludeColumns="NodeName,NodeType",JoinMethod=JoinAlways)
+CopyTable(TableID="Nodes_WithDailyData_v2",NewTableID="Network_Nodes_Missing_Daily_Data",ColumnExcludeFilters="HasData:Yes")
+#
+# Copy table and only keep the NodeID so that a For loop can be run that will create empty time series for the nodes without data
+CopyTable(TableID="Network_Nodes_Missing_Daily_Data",NewTableID="NodeID_Missing_Daily",IncludeColumns="TSID",ColumnMap="TSID:NodeID")
+# Create time series for nodes that do not have any data
+For(Name="nodatanodes",IteratorProperty="nodes1",TableID="NodeID_Missing_Daily",TableColumn="NodeID")
+NewPatternTimeSeries(Alias="%L-Empty-Day",NewTSID="${nodes1}..Empty.Day",SetStart="2000-01-01",SetEnd="2016-12-31",Units="CFS",PatternValues="0")
+EndFor(Name="nodatanodes")
+#
+# Write out time series as DV files
+WriteDateValue(TSList=AllMatchingTSID,TSID="*.*.*.Day",OutputFile="..\data-files\Poudre_Daily_Time_Series_Data")
+#
+#######################
+# HOURLY DATA
+#######################
+SetInputPeriod(InputStart="CurrentToMinute - 7Day")
+SetOutputPeriod(OutputStart="CurrentToMinute - 7Day",OutputEnd="CurrentToMinute")
+#
+# Download diversions; note that errors are okay here, just trying to get all of the time series downloaded
+ReadTimeSeriesList(TableID="Network_Diversion",LocationColumn="RealTimeNodeID",DataType="DISCHRG",Interval="Hour",DataStore="ColoradoWaterSMS",Alias="%L-DivTotal-Hour",IfNotFound=Warn)
+ReadTimeSeriesList(TableID="Network_Diversion",LocationColumn="RealTimeNodeID",DataType="DISCHRG1",Interval="Hour",DataStore="ColoradoWaterSMS",Alias="%L-DivTotal-Hour",IfNotFound=Warn)
+ReadTimeSeriesList(TableID="Network_Diversion",LocationColumn="RealTimeNodeID",DataType="DISCHRG2",Interval="Hour",DataStore="ColoradoWaterSMS",Alias="%L-DivTotal-Hour",IfNotFound=Warn)
+ReadTimeSeriesList(TableID="Network_Diversion",LocationColumn="RealTimeNodeID",DataType="DISCHRG3",Interval="Hour",DataStore="ColoradoWaterSMS",Alias="%L-DivTotal-Hour",IfNotFound=Warn)
+ReadTimeSeriesList(TableID="Network_Diversion",LocationColumn="RealTimeNodeID",DataType="DISCHRG4",Interval="Hour",DataStore="ColoradoWaterSMS",Alias="%L-DivTotal-Hour",IfNotFound=Warn)
+ReadTimeSeriesList(TableID="Network_Diversion",LocationColumn="RealTimeNodeID",DataType="DISCHRGA",Interval="Hour",DataStore="ColoradoWaterSMS",Alias="%L-DivTotal-Hour",IfNotFound=Warn)
+#
+#
+# Download returns; note that errors are okay here, just trying to get all of the time series downloaded
+ReadTimeSeriesList(TableID="Network_Return",LocationColumn="RealTimeNodeID",DataType="DISCHRG",Interval="Hour",DataStore="ColoradoWaterSMS",Alias="%L-ReturnTotal-Hour",IfNotFound=Warn)
+ReadTimeSeriesList(TableID="Network_Return",LocationColumn="RealTimeNodeID",DataType="DISCHRG1",Interval="Hour",DataStore="ColoradoWaterSMS",Alias="%L-ReturnTotal-Hour",IfNotFound=Warn)
+ReadTimeSeriesList(TableID="Network_Return",LocationColumn="RealTimeNodeID",DataType="DISCHRG2",Interval="Hour",DataStore="ColoradoWaterSMS",Alias="%L-ReturnTotal-Hour",IfNotFound=Warn)
+ReadTimeSeriesList(TableID="Network_Return",LocationColumn="RealTimeNodeID",DataType="DISCHRG3",Interval="Hour",DataStore="ColoradoWaterSMS",Alias="%L-ReturnTotal-Hour",IfNotFound=Warn)
+ReadTimeSeriesList(TableID="Network_Return",LocationColumn="RealTimeNodeID",DataType="DISCHRG4",Interval="Hour",DataStore="ColoradoWaterSMS",Alias="%L-ReturnTotal-Hour",IfNotFound=Warn)
+ReadTimeSeriesList(TableID="Network_Return",LocationColumn="RealTimeNodeID",DataType="DISCHRGA",Interval="Hour",DataStore="ColoradoWaterSMS",Alias="%L-ReturnTotal-Hour",IfNotFound=Warn)
+#
+# Download stream gages; note that errors are okay here, just trying to get all of the time series downloaded
+ReadTimeSeriesList(TableID="Network_Gage",LocationColumn="RealTimeNodeID",DataType="DISCHRG",Interval="Hour",DataStore="ColoradoWaterSMS",Alias="%L-GageTotal-Hour",IfNotFound=Warn)
+ReadTimeSeriesList(TableID="Network_Gage",LocationColumn="RealTimeNodeID",DataType="DISCHRG1",Interval="Hour",DataStore="ColoradoWaterSMS",Alias="%L-GageTotal-Hour",IfNotFound=Warn)
+ReadTimeSeriesList(TableID="Network_Gage",LocationColumn="RealTimeNodeID",DataType="DISCHRG2",Interval="Hour",DataStore="ColoradoWaterSMS",Alias="%L-GageTotal-Hour",IfNotFound=Warn)
+ReadTimeSeriesList(TableID="Network_Gage",LocationColumn="RealTimeNodeID",DataType="DISCHRG3",Interval="Hour",DataStore="ColoradoWaterSMS",Alias="%L-GageTotal-Hour",IfNotFound=Warn)
+ReadTimeSeriesList(TableID="Network_Gage",LocationColumn="RealTimeNodeID",DataType="DISCHRG4",Interval="Hour",DataStore="ColoradoWaterSMS",Alias="%L-GageTotal-Hour",IfNotFound=Warn)
+ReadTimeSeriesList(TableID="Network_Gage",LocationColumn="RealTimeNodeID",DataType="DISCHRGA",Interval="Hour",DataStore="ColoradoWaterSMS",Alias="%L-GageTotal-Hour",IfNotFound=Warn)
+# Copy Network_Gage table and use only the NodeID to create a property to download USGS gages
+CopyTable(TableID="Network_Gage",NewTableID="Network_Gage_ID_Only",IncludeColumns="NodeID")
+For(Name="GageData",IteratorProperty="gage1",TableID="Network_Gage_ID_Only",TableColumn="NodeID")
+ReadUsgsNwisInstantaneous(DataStore="UsgsNwisInstantaneous",Sites="${gage1}",Parameters="00060",Alias="%L-GageTotal-Irregular",WaterMLInterval="Irregular")
+EndFor(Name="GageData")
+# Now change the interval of the USGS streamflow time series data from irregular to hourly
+ChangeInterval(TSList=AllMatchingTSID,TSID="*Irregular*",Alias="%L-GageTotal-Hour",NewInterval=Hour,OldTimeScale=INST,NewTimeScale=INST,NewDataType=DISCHRG)
+#
+# Fill missing time series data with repeat forward and backward
+# This seems to be adequate for the shorter period of record (2 weeks)
+FillRepeat(TSList=AllMatchingTSID,TSID="*Hour*",FillDirection=Forward,FillFlag="FilledValue")
+FillRepeat(TSList=AllMatchingTSID,TSID="*Hour*",FillDirection=Backward,FillFlag="FilledValue")
+#
+# Copy time series properties to know how many nodes have data
+CopyTimeSeriesPropertiesToTable(TSList=AllMatchingTSID,TSID="*Hour*",TableID="Nodes_WithHourlyData",TableTSIDColumn="TSID",TableTSIDFormat="%L")
+CopyTable(TableID="Nodes_WithHourlyData",NewTableID="Nodes_WithHourlyData_v2",IncludeColumns="TSID")
+# Create a column to indicate that these nodes have data
+InsertTableColumn(TableID="Nodes_WithHourlyData_v2",InsertColumn="HasData",InitialValue="Yes")
+# Join the table with the original network table to identify which nodes have data.  Then copy the table and only include the nodes that do not have data
+# Empty time series will be created for the nodes without data
+JoinTables(TableID="Nodes_WithHourlyData_v2",TableToJoinID="Network",JoinColumns="TSID:RealTimeNodeID",IncludeColumns="NodeName,NodeType",JoinMethod=JoinAlways)
+CopyTable(TableID="Nodes_WithHourlyData_v2",NewTableID="Network_Nodes_Missing_Hourly_Data",ColumnExcludeFilters="HasData:Yes")
+#
+# Copy table and only keep the NodeID so that a For loop can be run that will create empty time series for the nodes without data
+CopyTable(TableID="Network_Nodes_Missing_Hourly_Data",NewTableID="NodeID_Missing_Hourly",IncludeColumns="TSID",ColumnMap="TSID:NodeID")
+# Create time series for nodes that do not have any data
+For(Name="nodatanodes2",IteratorProperty="nodes2",TableID="NodeID_Missing_Hourly",TableColumn="NodeID")
+NewPatternTimeSeries(Alias="%L-Empty-Hour",NewTSID="${nodes2}..Empty.Hour",Units="CFS",PatternValues="0")
+EndFor(Name="nodatanodes2")
+#
+# Write out time series as DV files
+WriteDateValue(TSList=AllMatchingTSID,TSID="*.*.*.Hour",OutputFile="..\data-files\Poudre_Hourly_Time_Series_Data")
+#
+#

@@ -1,0 +1,10 @@
+# Make sure this folder remains empty except for the Poudre_Pointflow_Dataset files (csv and xlsx).
+
+*
+!.gitignore
+!Poudre_Pointflow_Dataset.csv
+!Poudre_Pointflow_Dataset.xlsx
+
+
+
+

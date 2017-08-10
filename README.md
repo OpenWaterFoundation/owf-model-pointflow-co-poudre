@@ -11,43 +11,42 @@ The development of a point flow model is comprised of the following steps, which
 3. Build and run the point flow model
 4. Visualize the results
 
-##1. Build the Node Network
+## 1. Build the Node Network
 
 A point flow analysis relies on a "node network" representation of a stream system, in which measurement/calculation points represent discrete points
 of information.  Each node is allowed to have one downstream node, which represents most stream systems where water flows downhill and may contain 
 tributaries that merge at confluences.
 
-The node network is an [Excel file] (https://github.com/OpenWaterFoundation/owf-model-pointflow-co-poudre/blob/master/data-files/Poudre_PointFlow_Dataset.xlsx) 
+The node network is an [Excel file](https://github.com/OpenWaterFoundation/owf-model-pointflow-co-poudre/blob/master/data-files/Poudre_PointFlow_Dataset.xlsx) 
 in which each row in the datasheet represents a node in the network.  At its most basic level, the datasheet needs to contain
 the following columns of data:
-*NodeID -- the location ID of the node, typically corresponding to the location ID in time series data
-*NodeName -- a descriptive name for the node, which gives more detail than the NodeID
-*NodeType -- describes the node behavior (e.g., whether discharge is added, subtracted, or reset at the node)
-*NodeDist -- the node distance along the flow path; is used to estimate gain/loss
-*NodeWeight -- can be used to estimate gain/loss; weights indicate the relative weight of the reach gain/loss to be distributed between nodes on the reach
-*DownstreamNodeID -- the location ID for the next downstream node; needed to define network connectivity
+* NodeID -- the location ID of the node, typically corresponding to the location ID in time series data
+* NodeName -- a descriptive name for the node, which gives more detail than the NodeID
+* NodeType -- describes the node behavior (e.g., whether discharge is added, subtracted, or reset at the node)
+* NodeDist -- the node distance along the flow path; is used to estimate gain/loss
+* NodeWeight -- can be used to estimate gain/loss; weights indicate the relative weight of the reach gain/loss to be distributed between nodes on the reach
+* DownstreamNodeID -- the location ID for the next downstream node; needed to define network connectivity
 
 Additionally, the following columns are included in the datasheet:
-*RealTimeNodeID -- the location ID of the node for real-time data, which can differ from the NodeID
-*RealTimeDownstreamNodeID -- the location ID for the next downstream node based on the RealTimeNodeID
-*Longitude -- in decimal degrees
-*Latitude -- in decimal degrees
-*DataSource -- agency that provides the time series data; allows for faster processing of time series in TSTool
+* RealTimeNodeID -- the location ID of the node for real-time data, which can differ from the NodeID
+* RealTimeDownstreamNodeID -- the location ID for the next downstream node based on the RealTimeNodeID
+* Longitude -- in decimal degrees
+* Latitude -- in decimal degrees
+* DataSource -- agency that provides the time series data; allows for faster processing of time series in TSTool
 
 Currently, the node network file must be manually built.  Building the network can be simplified by using Colorado Division of Water Resources' Map Viewer.
-Within Map Viewer, it is possible to draw a polygon around the river of interest and export data layers (such as diversion records) to csv files.  Many of the data 
+Within Map Viewer, it is possible to draw a polygon around the river of interest and export data layers (such as diversion records) to `.csv` files.  Many of the data 
 layers contain data regarding the water source mile, which simplifies creating the node order and calculating node distances.  It is still necessary to go 
 through the river by hand to make sure all active diversions, returns and stream gages are included in the network.  Future enhancements may include using 
-TSTool to automate building some parts of the node network file using the csv files that can be downloaded from DWR's Map Viewer.
+TSTool to automate building some parts of the node network file using the `.csv` files that can be downloaded from DWR's Map Viewer.
 
-The node network file is also saved as a [csv file](https://github.com/OpenWaterFoundation/owf-model-pointflow-co-poudre/blob/master/data-files/Poudre_PointFlow_Dataset.csv).  
-This file is used for some of the visualizations.
+The node network file is also saved as a [csv file](https://github.com/OpenWaterFoundation/owf-model-pointflow-co-poudre/blob/master/data-files/Poudre_PointFlow_Dataset.csv).  This file is used for some of the visualizations.
 
-##2.  Gather Time Series Data
+## 2.  Gather Time Series Data
 
 Diversion, return and streamflow time series data are downloaded via the [CDSS TSTool Software](http://cdss.state.co.us/software/Pages/TSTool.aspx), which automates
 the data collection process.  TSTool provides features to access time series, tables and spatial data in databases, files and from internet web services.  For the 
-point flow model, the HydroBase datastore is used (ColoradoWaterHBGuest).  The command file `Poudre_Nodes_Data_Download.TSTool` downloads daily and hourly time series
+point flow model, the HydroBase datastore is used (ColoradoWaterHBGuest).  The command file [Poudre_Nodes_Data_Download.TSTool](https://github.com/OpenWaterFoundation/owf-model-pointflow-co-poudre/blob/master/TSTool/Poudre_Nodes_Data_Download.TSTool) downloads daily and hourly time series
 data for all nodes that contain data.  For daily data, the default period of record is 2000-2016, but this can be changed by the user.  For hourly data, the period of 
 record is the previous seven days up to the most current measurement.  
 
@@ -57,13 +56,13 @@ removed from or put into the river, even if no data are currently associated wit
 
 Time series data are then saved as `.dv` files which are read into other TSTool command files.
 
-##3.  Build and Run the Point Flow Model
+## 3.  Build and Run the Point Flow Model
 
 Point flow models use relatively simple water balance calculations to account for diversions and returns (or inflows) between known flow points, typically at stream gages.
 Error calculated in the water balance in a reach is attributed to a gain or loss in the reach and is typically distributed back to each location (node) via a stream mile 
 proration or other approach.
 
-Building and running the point flow model is done through the TSTool software.  The command files `Poudre_Daily_PointFlowModel.TSTool` and `Poudre_Hourly_PointFlowModel.TSTool`
+Building and running the point flow model is done through the TSTool software.  The command files [Poudre_Daily_PointFlowModel.TSTool](https://github.com/OpenWaterFoundation/owf-model-pointflow-co-poudre/blob/master/TSTool/Poudre_Daily_PointFlowModel.TSTool) and [Poudre_Hourly_PointFlowModel.TSTool](https://github.com/OpenWaterFoundation/owf-model-pointflow-co-poudre/blob/master/TSTool/Poudre_Hourly_PointFlowModel.TSTool)
 contain the steps necessary to run the daily and hourly point flow models, respectively.  The `.dv` files created in the previous step are read into the file.  
 For the daily point flow model, any missing data for diversions and returns are filled with zeroes so that the model can run.  Missing stream gage data are filled by 
 repeating nearby values; this is adequate for small gaps in the data but needs to be further evaluated for larger gaps.  For the hourly point flow model, missing data
@@ -75,10 +74,10 @@ Several output time series are generated for each node; the primary time series 
 
 The NodeOutflow time series are then written to a table, which is then exported as a `.csv` file to be used in visualizations.
 
-** The AnalyzeNetworkPointFlow() command currently does not handle branching networks (tributaries) in calculations.  It also does not handle reservoirs and storage
+**The AnalyzeNetworkPointFlow() command currently does not handle branching networks (tributaries) in calculations.  It also does not handle reservoirs and storage
 calculations.  These limitations will be addressed with future enhancements to TSTool.**
 
-##4.  Visualize the Results
+## 4.  Visualize the Results
 
 Point flow model results are currently visualized as a heat map (also called a raster graph).  Heat maps represent individual data values in a matrix as colors.  The
 layout represents upstream to downstream distance on the x-axis and day (or hour) on the y-axis.  Hovering on a cell displays the discharge for that day/hour in a popup.  
@@ -155,10 +154,8 @@ The point flow model has been tested with TSTool 12.00.00
 To run either the daily or hourly point flow models, first start TSTool and open the
  [Poudre_Nodes_Data_Download.TSTool](https://github.com/OpenWaterFoundation/owf-model-pointflow-co-poudre/blob/master/TSTool/Poudre_Nodes_Data_Download.TSTool)
  command file.  Click the "Run All Commands" button in the middle of the screen; the file will take about 5 minutes to complete.  Next, open the
- [Poudre_Daily_PointFlowModel.TSTool]
- (https://github.com/OpenWaterFoundation/owf-model-pointflow-co-poudre/blob/master/TSTool/Poudre_Daily_PointFlowModel.TSTool)
- command file or the [Poudre_Hourly_PointFlowModel.TSTool]
- (https://github.com/OpenWaterFoundation/owf-model-pointflow-co-poudre/blob/master/TSTool/Poudre_Hourly_PointFlowModel.TSTool)
+ [Poudre_Daily_PointFlowModel.TSTool](https://github.com/OpenWaterFoundation/owf-model-pointflow-co-poudre/blob/master/TSTool/Poudre_Daily_PointFlowModel.TSTool)
+ command file or the [Poudre_Hourly_PointFlowModel.TSTool](https://github.com/OpenWaterFoundation/owf-model-pointflow-co-poudre/blob/master/TSTool/Poudre_Hourly_PointFlowModel.TSTool)
  command file depending on the time interval of interest.  Click the "Run All Commands" button and the file will complete shortly.
 
 ## 6. View the point flow model heat map in a browser

@@ -53,23 +53,23 @@
         if(line != '')
         {
           var items = line.split(',');
-          if(!x_label_categories.includes(items[1]))
+          if(!x_label_categories.includes(items[2]))
           {
             var x_label_info = '';
             /* Check if Stream Gage */ 
-            if(items[2] == "StreamGage")
+            if(items[3] == "StreamGage")
             {
-              x_label_info = '<span style="font-size: 12px; background: #c6c6c4; color: black;">' + items[1] + '</span>';
+              x_label_info = '<span style="font-size: 12px; background: #c6c6c4; color: black;">' + items[2] + '</span>';
             }
             /* Check if Diversion */
-            else if(items[2] == "Diversion")
+            else if(items[3] == "Diversion")
             {
-              x_label_info = '<span style="font-size: 12px; background: LightBlue; color: black;">' + items[1] + '</span>';
+              x_label_info = '<span style="font-size: 12px; background: LightBlue; color: black;">' + items[2] + '</span>';
             }
             /* Check if Return */
             else
             {
-              x_label_info = '<span style="font-size: 12px; background: #f7f591; color: black;">' + items[1] + '</span>';
+              x_label_info = '<span style="font-size: 12px; background: #f7f591; color: black;">' + items[2] + '</span>';
             }  
             x_label_categories.push(x_label_info);
           }

@@ -96,11 +96,6 @@ EndFor(Name="GageData")
 # Now change the interval of the USGS streamflow time series data from irregular to hourly
 ChangeInterval(TSList=AllMatchingTSID,TSID="*Irregular*",Alias="%L-GageTotal-Hour",NewInterval=Hour,OldTimeScale=INST,NewTimeScale=INST,NewDataType=DISCHRG)
 #
-# Fill missing time series data with repeat forward and backward
-# This seems to be adequate for the shorter period of record (2 weeks)
-FillRepeat(TSList=AllMatchingTSID,TSID="*Hour*",FillDirection=Forward,FillFlag="FilledValue")
-FillRepeat(TSList=AllMatchingTSID,TSID="*Hour*",FillDirection=Backward,FillFlag="FilledValue")
-#
 # Copy time series properties to know how many nodes have data
 CopyTimeSeriesPropertiesToTable(TSList=AllMatchingTSID,TSID="*Hour*",TableID="Nodes_WithHourlyData",TableTSIDColumn="TSID",TableTSIDFormat="%L")
 CopyTable(TableID="Nodes_WithHourlyData",NewTableID="Nodes_WithHourlyData_v2",IncludeColumns="TSID")

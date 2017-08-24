@@ -1,0 +1,12 @@
+# Ignore the following files so that they do not get committed to the repository.
+# Note that additional .gitignore files may be present in specific folders.
+
+# Ignore log files, for example produced by TSTool
+*.log
+
+# Ignore vi/vim editor swap files
+*.swp
+*.swo
+
+# Ignore Microsoft Office temporary files
+~$*

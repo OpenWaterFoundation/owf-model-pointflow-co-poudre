@@ -1,0 +1,12 @@
+# Global settings for the repository
+
+# Cause line endings in the repository to be newline (\n) and local files to be that of the operating system.
+* text=auto
+
+# Denote binary files (so line ending characters aren't modified)
+
+*.docx binary
+*.xlsx binary
+
+*.jpg binary
+*.png binary
